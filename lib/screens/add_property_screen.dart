@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:video_thumbnail/video_thumbnail.dart';
-import 'package:path_provider/path_provider.dart';
+// import 'package:video_thumbnail/video_thumbnail.dart';  // COMMENTED OUT - causing build issues
+// import 'package:path_provider/path_provider.dart';
 import '../models/property.dart';
 import '../utils/constants.dart';
 import '../utils/zambia_areas.dart';
@@ -148,7 +148,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
               
               // Area
               DropdownButtonFormField<String>(
-                initialValue: _selectedArea,
+                value: _selectedArea,
                 decoration: const InputDecoration(
                   labelText: 'Area *',
                   border: OutlineInputBorder(),
@@ -563,7 +563,9 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
           _hasVideo = true;
         });
         
-        // Generate thumbnail
+        // THUMBNAIL GENERATION COMMENTED OUT - causing build issues
+        // Will be re-enabled when video_thumbnail package is compatible
+        /*
         final Directory tempDir = await getTemporaryDirectory();
         final String thumbnailPath = await VideoThumbnail.thumbnailFile(
           video: video.path,
@@ -575,6 +577,12 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         
         setState(() {
           _videoThumbnail = thumbnailPath;
+        });
+        */
+        
+        // Temporary placeholder for thumbnail
+        setState(() {
+          _videoThumbnail = null;
         });
       }
     } catch (e) {
