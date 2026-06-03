@@ -50,7 +50,7 @@ dependencies:
   chewie: ^1.7.5  # Video controls with better UI
   
   # Video thumbnails
-  video_thumbnail: ^0.5.3
+  #video_thumbnail: ^0.5.3
 
   
   # Image compression
