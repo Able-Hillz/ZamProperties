@@ -15,12 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
-
-  // Demo credentials (store registered agents too)
-  final Map<String, String> _demoAgents = {
-    '+260977123456': 'password123',
-    '+260966789012': 'password123',
-  };
+  bool _obscurePassword = true;
 
   Future<void> _login() async {
     if (_phoneController.text.isEmpty || _passwordController.text.isEmpty) {
@@ -32,27 +27,41 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
 
-    await Future.delayed(const Duration(seconds: 1));
+    await Future.delayed(const Duration(milliseconds: 500));
 
-    // Check registered agents from SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     final registeredPhone = prefs.getString('agentPhone');
     final registeredPassword = prefs.getString('agentPassword');
+    final isRegistered = prefs.getBool('isRegistered') ?? false;
     
-    // Check demo OR registered agent
+    // Check credentials
     bool isValid = false;
     
-    if (_demoAgents.containsKey(_phoneController.text) &&
-        _demoAgents[_phoneController.text] == _passwordController.text) {
+    // Demo agents
+    if (_phoneController.text == '+260977123456' && _passwordController.text == 'password123') {
       isValid = true;
-    } else if (registeredPhone == _phoneController.text && 
-               registeredPassword == _passwordController.text) {
+      await prefs.setString('agentId', 'demo_agent_1');
+      await prefs.setString('agentName', 'Demo Agent');
+      await prefs.setString('agentPhone', _phoneController.text);
+      await prefs.setString('agentCompany', 'Demo Real Estate');
+      await prefs.setString('agentEmail', 'demo@realestate.com');
+    } 
+    else if (_phoneController.text == '+260966789012' && _passwordController.text == 'password123') {
+      isValid = true;
+      await prefs.setString('agentId', 'demo_agent_2');
+      await prefs.setString('agentName', 'Test Agent');
+      await prefs.setString('agentPhone', _phoneController.text);
+      await prefs.setString('agentCompany', 'Test Properties');
+      await prefs.setString('agentEmail', 'test@properties.com');
+    }
+    // Registered agent
+    else if (isRegistered && registeredPhone == _phoneController.text && 
+             registeredPassword == _passwordController.text) {
       isValid = true;
     }
     
     if (isValid) {
       await prefs.setBool('isLoggedIn', true);
-      await prefs.setString('agentPhone', _phoneController.text);
       await prefs.setString('userType', 'agent');
       
       if (mounted) {
@@ -80,11 +89,13 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: SingleChildScrollView(  // FIX: Wrap with ScrollView
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const SizedBox(height: 40),
               Container(
                 width: 100,
                 height: 100,
@@ -104,20 +115,22 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: AppConstants.headline1.copyWith(
                   color: AppConstants.primaryColor,
                 ),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               const Text(
                 'Agent Login',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 48),
               
-              TextField(
+              TextFormField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
                 decoration: InputDecoration(
                   labelText: 'Phone Number',
-                  hintText: '+260XXXXXXXXX',
+                  hintText: '+260977123456',
                   prefixIcon: const Icon(Icons.phone),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -126,12 +139,20 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 16),
               
-              TextField(
+              TextFormField(
                 controller: _passwordController,
-                obscureText: true,
+                obscureText: _obscurePassword,
                 decoration: InputDecoration(
                   labelText: 'Password',
                   prefixIcon: const Icon(Icons.lock),
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -141,18 +162,28 @@ class _LoginScreenState extends State<LoginScreen> {
               
               SizedBox(
                 width: double.infinity,
+                height: 50,
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _login,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppConstants.primaryColor,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                   child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('Login'),
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Login',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
                 ),
               ),
               
@@ -185,7 +216,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ],
               ),
               
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               
               Container(
                 padding: const EdgeInsets.all(12),
@@ -202,9 +233,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     SizedBox(height: 8),
                     Text('Phone: +260977123456'),
                     Text('Password: password123'),
+                    SizedBox(height: 4),
+                    Text('Phone: +260966789012'),
+                    Text('Password: password123'),
                   ],
                 ),
               ),
+              const SizedBox(height: 20),
             ],
           ),
         ),
