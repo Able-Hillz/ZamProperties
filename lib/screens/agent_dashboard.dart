@@ -1,377 +1,304 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../models/property.dart';
-import '../services/mock_data_service.dart';
-import '../services/chat_service.dart';
-import '../widgets/property_card.dart';
+import '../services/rating_service.dart';
+import '../services/complaint_service.dart';
+import '../models/complaint.dart';
+import '../models/rating.dart';
 import '../utils/constants.dart';
-import 'add_property_screen.dart';
-import 'agent_verification_screen.dart';
-import 'chat_list_screen.dart';
 
-class AgentDashboard extends StatefulWidget {
-  final VoidCallback toggleTheme;
-  final bool isDarkMode;
 
-  const AgentDashboard({
-    super.key,
-    required this.toggleTheme,
-    required this.isDarkMode,
-  });
+class AdminDashboard extends StatefulWidget {
+  const AdminDashboard({super.key});
 
   @override
-  State<AgentDashboard> createState() => _AgentDashboardState();
+  State<AdminDashboard> createState() => _AdminDashboardState();
 }
 
-class _AgentDashboardState extends State<AgentDashboard> {
-  List<Property> _myProperties = [];
-  String? _agentPhone;
-  String? _agentId;
-  bool _isLoading = true;
-  int _unreadCount = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadAgentData();
-    _updateUnreadCount();
-  }
-
-  Future<void> _updateUnreadCount() async {
-    if (_agentId != null) {
-      setState(() {
-        _unreadCount = ChatService.getAgentUnreadCount(_agentId!);
-      });
-    }
-  }
-
-  Future<void> _loadAgentData() async {
-    setState(() => _isLoading = true);
-    
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _agentId = prefs.getString('agentId');
-      _agentPhone = prefs.getString('agentPhone');
-      _myProperties = MockDataService.getAllProperties();
-      _isLoading = false;
-    });
-    await _updateUnreadCount();
-  }
-
-  void _addProperty(Property newProperty) {
-    setState(() {
-      MockDataService.addProperty(newProperty);
-      _myProperties = MockDataService.getAllProperties();
-    });
-  }
-
-  void _updatePropertyStatus(Property property, PropertyStatus newStatus) {
-    setState(() {
-      MockDataService.updatePropertyStatus(property.id, newStatus);
-      _myProperties = MockDataService.getAllProperties();
-    });
-  }
-
-  Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    if (mounted) {
-      Navigator.pushReplacementNamed(context, '/login');
-    }
-  }
-
-  Future<void> _goToVerification() async {
-    if (_agentId == null) return;
-    
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AgentVerificationScreen(
-          agentId: _agentId!,
-          agentPhone: _agentPhone ?? '',
-        ),
-      ),
-    );
-    
-    if (result == true) {
-      _loadAgentData();
-    }
-  }
-
-  Future<void> _goToChats() async {
-    if (_agentId == null) return;
-    
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ChatListScreen(
-          userId: _agentId!,
-          userName: 'Agent',
-          isAgent: true,
-        ),
-      ),
-    );
-    await _updateUnreadCount();
-  }
-
+class _AdminDashboardState extends State<AdminDashboard> {
+  int _selectedIndex = 0;
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: widget.isDarkMode ? Colors.grey[900] : Colors.grey[50],
       appBar: AppBar(
+        title: const Text('Admin Dashboard'),
         backgroundColor: AppConstants.primaryColor,
-        elevation: 0,
-        title: const Text('Agent Dashboard'),
         actions: [
-          // Messages button with unread count
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.message),
-                onPressed: _goToChats,
-                tooltip: 'Messages',
-              ),
-              if (_unreadCount > 0)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 14,
-                      minHeight: 14,
-                    ),
-                    child: Text(
-                      '$_unreadCount',
-                      style: const TextStyle(color: Colors.white, fontSize: 9),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          // Dark mode toggle
-          IconButton(
-            icon: Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
-            onPressed: widget.toggleTheme,
-            tooltip: widget.isDarkMode ? 'Light Mode' : 'Dark Mode',
-          ),
-          // Verification button
-          IconButton(
-            icon: const Icon(Icons.verified_user),
-            onPressed: _goToVerification,
-            tooltip: 'Verify Business',
-          ),
-          // Logout button
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: _logout,
-            tooltip: 'Logout',
+            onPressed: () {
+              // Logout logic
+              Navigator.pushReplacementNamed(context, '/user-type');
+            },
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                // Stats cards
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _buildStatCard(
-                          'Total Listings',
-                          _myProperties.length.toString(),
-                          Icons.home,
-                          Colors.blue,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildStatCard(
-                          'Active',
-                          _myProperties.where((p) => p.status == PropertyStatus.available).length.toString(),
-                          Icons.check_circle,
-                          Colors.green,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildStatCard(
-                          'Sold/Rented',
-                          _myProperties.where((p) => p.status != PropertyStatus.available).length.toString(),
-                          Icons.sell,
-                          Colors.orange,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                // Listings header
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'My Listings',
-                        style: AppConstants.headline2,
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: () async {
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const AddPropertyScreen(),
-                            ),
-                          );
-                          if (result != null && result is Property) {
-                            _addProperty(result);
-                          }
-                        },
-                        icon: const Icon(Icons.add),
-                        label: const Text('Add Property'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppConstants.primaryColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: 16),
-                
-                // Properties list
-                Expanded(
-                  child: _myProperties.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.home_work, size: 80, color: Colors.grey[400]),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No properties yet',
-                                style: AppConstants.headline2.copyWith(color: Colors.grey[600]),
-                              ),
-                              const SizedBox(height: 8),
-                              const Text('Tap + to add your first property'),
-                            ],
-                          ),
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: _myProperties.length,
-                          itemBuilder: (context, index) {
-                            final property = _myProperties[index];
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 16),
-                              child: Column(
-                                children: [
-                                  PropertyCard(
-                                    property: property,
-                                    onTap: () {
-                                      showModalBottomSheet(
-                                        context: context,
-                                        builder: (context) {
-                                          return Container(
-                                            padding: const EdgeInsets.all(16),
-                                            child: Column(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const Text(
-                                                  'Update Status',
-                                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                                                ),
-                                                const SizedBox(height: 16),
-                                                ListTile(
-                                                  leading: const Icon(Icons.check_circle, color: Colors.green),
-                                                  title: const Text('Mark as Available'),
-                                                  onTap: () {
-                                                    _updatePropertyStatus(property, PropertyStatus.available);
-                                                    Navigator.pop(context);
-                                                  },
-                                                ),
-                                                ListTile(
-                                                  leading: const Icon(Icons.sell, color: Colors.red),
-                                                  title: const Text('Mark as Sold'),
-                                                  onTap: () {
-                                                    _updatePropertyStatus(property, PropertyStatus.sold);
-                                                    Navigator.pop(context);
-                                                  },
-                                                ),
-                                                ListTile(
-                                                  leading: const Icon(Icons.home, color: Colors.orange),
-                                                  title: const Text('Mark as Rented'),
-                                                  onTap: () {
-                                                    _updatePropertyStatus(property, PropertyStatus.rented);
-                                                    Navigator.pop(context);
-                                                  },
-                                                ),
-                                                const Divider(),
-                                                ListTile(
-                                                  leading: const Icon(Icons.delete, color: Colors.red),
-                                                  title: const Text('Delete Listing'),
-                                                  onTap: () {
-                                                    Navigator.pop(context);
-                                                    ScaffoldMessenger.of(context).showSnackBar(
-                                                      const SnackBar(content: Text('Delete feature coming soon')),
-                                                    );
-                                                  },
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        },
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                ),
-              ],
-            ),
+      body: _selectedIndex == 0 ? _buildComplaintsTab() : _buildRatingsTab(),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.report_problem),
+            label: 'Complaints',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.star),
+            label: 'Ratings',
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: widget.isDarkMode ? Colors.grey[800] : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
+  Widget _buildComplaintsTab() {
+    final complaints = ComplaintService.getPendingComplaints();
+    
+    return complaints.isEmpty
+        ? Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.check_circle, size: 80, color: Colors.green[300]),
+                const SizedBox(height: 16),
+                Text(
+                  'No pending complaints',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 18),
+                ),
+              ],
+            ),
+          )
+        : ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: complaints.length,
+            itemBuilder: (context, index) {
+              final complaint = complaints[index];
+              return _buildComplaintCard(complaint);
+            },
+          );
+  }
+
+  Widget _buildComplaintCard(Complaint complaint) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: ExpansionTile(
+        leading: CircleAvatar(
+          backgroundColor: _getStatusColor(complaint.status),
+          child: const Icon(Icons.report_problem, color: Colors.white, size: 20),
+        ),
+        title: Text(complaint.subject),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('From: ${complaint.customerName}'),
+            Text('Type: ${_getTypeLabel(complaint.type)}'),
+            Text('Status: ${complaint.status.toUpperCase()}',
+                style: TextStyle(color: _getStatusColor(complaint.status))),
+          ],
+        ),
         children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-          Text(
-            title,
-            style: AppConstants.caption,
-            textAlign: TextAlign.center,
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Description:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text(complaint.description),
+                const SizedBox(height: 16),
+                
+                const Text('Customer Contact:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text('Phone: ${complaint.customerPhone}'),
+                
+                const SizedBox(height: 16),
+                const Text('Admin Response:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: TextEditingController(text: complaint.adminResponse),
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    hintText: 'Write your response here...',
+                  ),
+                  onChanged: (value) {
+                    // Store response
+                  },
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => _updateComplaintStatus(complaint.id, 'reviewing'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                        ),
+                        child: const Text('Mark Reviewing'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => _updateComplaintStatus(complaint.id, 'resolved'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                        ),
+                        child: const Text('Resolve'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => _updateComplaintStatus(complaint.id, 'rejected'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                        ),
+                        child: const Text('Reject'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildRatingsTab() {
+    final ratings = RatingService.getPendingRatings();
+    
+    return ratings.isEmpty
+        ? Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.star_half, size: 80, color: Colors.grey[400]),
+                const SizedBox(height: 16),
+                Text(
+                  'No pending ratings',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 18),
+                ),
+              ],
+            ),
+          )
+        : ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: ratings.length,
+            itemBuilder: (context, index) {
+              final rating = ratings[index];
+              return _buildRatingCard(rating);
+            },
+          );
+  }
+
+  Widget _buildRatingCard(Rating rating) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: Colors.amber,
+                  child: Text(
+                    rating.rating.toString(),
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(rating.customerName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Row(
+                        children: List.generate(5, (index) {
+                          return Icon(
+                            index < rating.rating ? Icons.star : Icons.star_border,
+                            color: Colors.amber,
+                            size: 16,
+                          );
+                        }),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(rating.comment),
+            if (rating.propertyTitle != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Property: ${rating.propertyTitle}',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                ),
+              ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => RatingService.approveRating(rating.id),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                    ),
+                    child: const Text('Approve'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => RatingService.rejectRating(rating.id),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                    ),
+                    child: const Text('Reject'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _updateComplaintStatus(String complaintId, String status) async {
+    await ComplaintService.updateComplaintStatus(complaintId: complaintId, status: status);
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Complaint marked as $status')),
+    );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'pending': return Colors.orange;
+      case 'reviewing': return Colors.blue;
+      case 'resolved': return Colors.green;
+      case 'rejected': return Colors.red;
+      default: return Colors.grey;
+    }
+  }
+
+  String _getTypeLabel(ComplaintType type) {
+    switch (type) {
+      case ComplaintType.appIssue: return 'App Issue';
+      case ComplaintType.agentConduct: return 'Agent Conduct';
+      case ComplaintType.propertyMisrepresentation: return 'Property Misrepresentation';
+      case ComplaintType.paymentIssue: return 'Payment Issue';
+      case ComplaintType.other: return 'Other';
+    }
   }
 }
