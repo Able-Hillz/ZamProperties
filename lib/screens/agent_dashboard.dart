@@ -1,304 +1,154 @@
 import 'package:flutter/material.dart';
-import '../services/rating_service.dart';
-import '../services/complaint_service.dart';
-import '../models/complaint.dart';
-import '../models/rating.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/constants.dart';
 
+class AgentDashboard extends StatefulWidget {
+  final Function toggleTheme;
+  final bool isDarkMode;
 
-class AdminDashboard extends StatefulWidget {
-  const AdminDashboard({super.key});
+  const AgentDashboard({
+    super.key,
+    required this.toggleTheme,
+    required this.isDarkMode,
+  });
 
   @override
-  State<AdminDashboard> createState() => _AdminDashboardState();
+  State<AgentDashboard> createState() => _AgentDashboardState();
 }
 
-class _AdminDashboardState extends State<AdminDashboard> {
+class _AgentDashboardState extends State<AgentDashboard> {
   int _selectedIndex = 0;
-  
+
+  final List<Widget> _tabs = [
+    const PropertiesTab(),
+    const ClientsTab(),
+    const AppointmentsTab(),
+    const MessagesTab(),
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Admin Dashboard'),
+        title: const Text('Agent Dashboard'),
         backgroundColor: AppConstants.primaryColor,
         actions: [
           IconButton(
+            icon: Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
+            onPressed: () => widget.toggleTheme(),
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
-              // Logout logic
-              Navigator.pushReplacementNamed(context, '/user-type');
-            },
+            onPressed: () => _logout(),
           ),
         ],
       ),
-      body: _selectedIndex == 0 ? _buildComplaintsTab() : _buildRatingsTab(),
+      body: _tabs[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
-        onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
+        onTap: (index) => setState(() => _selectedIndex = index),
+        type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.report_problem),
-            label: 'Complaints',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.star),
-            label: 'Ratings',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.house), label: 'Properties'),
+          BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Clients'),
+          BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Appointments'),
+          BottomNavigationBarItem(icon: Icon(Icons.message), label: 'Messages'),
         ],
       ),
     );
   }
 
-  Widget _buildComplaintsTab() {
-    final complaints = ComplaintService.getPendingComplaints();
-    
-    return complaints.isEmpty
-        ? Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.check_circle, size: 80, color: Colors.green[300]),
-                const SizedBox(height: 16),
-                Text(
-                  'No pending complaints',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 18),
-                ),
-              ],
-            ),
-          )
-        : ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: complaints.length,
-            itemBuilder: (context, index) {
-              final complaint = complaints[index];
-              return _buildComplaintCard(complaint);
-            },
-          );
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    if (mounted) {
+      Navigator.pushReplacementNamed(context, '/user-type');
+    }
   }
+}
 
-  Widget _buildComplaintCard(Complaint complaint) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: ExpansionTile(
-        leading: CircleAvatar(
-          backgroundColor: _getStatusColor(complaint.status),
-          child: const Icon(Icons.report_problem, color: Colors.white, size: 20),
-        ),
-        title: Text(complaint.subject),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('From: ${complaint.customerName}'),
-            Text('Type: ${_getTypeLabel(complaint.type)}'),
-            Text('Status: ${complaint.status.toUpperCase()}',
-                style: TextStyle(color: _getStatusColor(complaint.status))),
-          ],
-        ),
+class PropertiesTab extends StatelessWidget {
+  const PropertiesTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Description:', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Text(complaint.description),
-                const SizedBox(height: 16),
-                
-                const Text('Customer Contact:', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Text('Phone: ${complaint.customerPhone}'),
-                
-                const SizedBox(height: 16),
-                const Text('Admin Response:', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: TextEditingController(text: complaint.adminResponse),
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    hintText: 'Write your response here...',
-                  ),
-                  onChanged: (value) {
-                    // Store response
-                  },
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () => _updateComplaintStatus(complaint.id, 'reviewing'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange,
-                        ),
-                        child: const Text('Mark Reviewing'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () => _updateComplaintStatus(complaint.id, 'resolved'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                        ),
-                        child: const Text('Resolve'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () => _updateComplaintStatus(complaint.id, 'rejected'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                        ),
-                        child: const Text('Reject'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+          const Icon(Icons.house, size: 80, color: Colors.grey),
+          const SizedBox(height: 16),
+          const Text('Your Properties', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          const Text('List of your properties will appear here'),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: () {},
+            style: ElevatedButton.styleFrom(backgroundColor: AppConstants.primaryColor),
+            child: const Text('Add New Property'),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildRatingsTab() {
-    final ratings = RatingService.getPendingRatings();
-    
-    return ratings.isEmpty
-        ? Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.star_half, size: 80, color: Colors.grey[400]),
-                const SizedBox(height: 16),
-                Text(
-                  'No pending ratings',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 18),
-                ),
-              ],
-            ),
-          )
-        : ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: ratings.length,
-            itemBuilder: (context, index) {
-              final rating = ratings[index];
-              return _buildRatingCard(rating);
-            },
-          );
-  }
+class ClientsTab extends StatelessWidget {
+  const ClientsTab({super.key});
 
-  Widget _buildRatingCard(Rating rating) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: Colors.amber,
-                  child: Text(
-                    rating.rating.toString(),
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(rating.customerName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      Row(
-                        children: List.generate(5, (index) {
-                          return Icon(
-                            index < rating.rating ? Icons.star : Icons.star_border,
-                            color: Colors.amber,
-                            size: 16,
-                          );
-                        }),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(rating.comment),
-            if (rating.propertyTitle != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  'Property: ${rating.propertyTitle}',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                ),
-              ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => RatingService.approveRating(rating.id),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                    ),
-                    child: const Text('Approve'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => RatingService.rejectRating(rating.id),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                    ),
-                    child: const Text('Reject'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.people, size: 80, color: Colors.grey),
+          SizedBox(height: 16),
+          Text('Your Clients', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          SizedBox(height: 8),
+          Text('List of your clients will appear here'),
+        ],
       ),
     );
   }
+}
 
-  Future<void> _updateComplaintStatus(String complaintId, String status) async {
-    await ComplaintService.updateComplaintStatus(complaintId: complaintId, status: status);
-    setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Complaint marked as $status')),
+class AppointmentsTab extends StatelessWidget {
+  const AppointmentsTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.calendar_today, size: 80, color: Colors.grey),
+          SizedBox(height: 16),
+          Text('Appointments', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          SizedBox(height: 8),
+          Text('Your scheduled appointments will appear here'),
+        ],
+      ),
     );
   }
+}
 
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'pending': return Colors.orange;
-      case 'reviewing': return Colors.blue;
-      case 'resolved': return Colors.green;
-      case 'rejected': return Colors.red;
-      default: return Colors.grey;
-    }
-  }
+class MessagesTab extends StatelessWidget {
+  const MessagesTab({super.key});
 
-  String _getTypeLabel(ComplaintType type) {
-    switch (type) {
-      case ComplaintType.appIssue: return 'App Issue';
-      case ComplaintType.agentConduct: return 'Agent Conduct';
-      case ComplaintType.propertyMisrepresentation: return 'Property Misrepresentation';
-      case ComplaintType.paymentIssue: return 'Payment Issue';
-      case ComplaintType.other: return 'Other';
-    }
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.message, size: 80, color: Colors.grey),
+          SizedBox(height: 16),
+          Text('Messages', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          SizedBox(height: 8),
+          Text('Your messages will appear here'),
+        ],
+      ),
+    );
   }
 }
