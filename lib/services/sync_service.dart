@@ -1,5 +1,6 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'supabase_service.dart';
 
 class SyncService {
   static final Connectivity _connectivity = Connectivity();
@@ -22,8 +23,12 @@ class SyncService {
     isSyncing.value = true;
     
     try {
-      // In production, sync with Firebase
-      await Future.delayed(const Duration(seconds: 1));
+      // Sync with Supabase if available
+      if (SupabaseService.isAvailable) {
+        await SupabaseService.syncLocalToCloud();
+        await SupabaseService.pullFromCloud();
+      }
+      
       print('✅ Sync completed at ${DateTime.now()}');
     } catch (e) {
       print('❌ Sync failed: $e');
@@ -48,7 +53,7 @@ class SyncService {
               const Icon(Icons.wifi_off, size: 16, color: Colors.white),
               const SizedBox(width: 8),
               const Text(
-                'Offline Mode - Using cached data',
+                'Offline Mode - Changes will sync when online',
                 style: TextStyle(color: Colors.white, fontSize: 12),
               ),
               if (isSyncing.value) ...[

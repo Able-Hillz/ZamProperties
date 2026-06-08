@@ -1,4 +1,4 @@
-enum PropertyType { rent, buy, land }
+enum PropertyType { rent, buy, land, car }
 enum PropertyStatus { available, sold, rented }
 
 class Property {
@@ -19,12 +19,26 @@ class Property {
   final String? locationAddress;
   final String? googleMapsLink;
   
-  // NEW: Video walkthrough
+  // Video walkthrough
   final String? videoUrl;
   final String? videoThumbnailUrl;
   
-  // NEW: 360° photos
+  // 360° photos
   final List<String> threeSixtyImageUrls;
+  
+  // Promoted listings
+  final bool isPromoted;
+  final DateTime? promotionExpiry;
+  
+  // Car-specific fields
+  final String? carMake;
+  final String? carModel;
+  final int? carYear;
+  final String? carFuelType;
+  final String? carTransmission;
+  final int? carMileage;
+  final String? carColor;
+  final String? carCondition;
 
   Property({
     required this.id,
@@ -46,6 +60,17 @@ class Property {
     this.videoUrl,
     this.videoThumbnailUrl,
     this.threeSixtyImageUrls = const [],
+    this.isPromoted = false,
+    this.promotionExpiry,
+    // Car fields
+    this.carMake,
+    this.carModel,
+    this.carYear,
+    this.carFuelType,
+    this.carTransmission,
+    this.carMileage,
+    this.carColor,
+    this.carCondition,
   });
 
   Map<String, dynamic> toMap() {
@@ -69,6 +94,17 @@ class Property {
       'videoUrl': videoUrl,
       'videoThumbnailUrl': videoThumbnailUrl,
       'threeSixtyImageUrls': threeSixtyImageUrls,
+      'isPromoted': isPromoted,
+      'promotionExpiry': promotionExpiry?.toIso8601String(),
+      // Car fields
+      'carMake': carMake,
+      'carModel': carModel,
+      'carYear': carYear,
+      'carFuelType': carFuelType,
+      'carTransmission': carTransmission,
+      'carMileage': carMileage,
+      'carColor': carColor,
+      'carCondition': carCondition,
     };
   }
 
@@ -95,6 +131,19 @@ class Property {
       threeSixtyImageUrls: map['threeSixtyImageUrls'] != null 
           ? List<String>.from(map['threeSixtyImageUrls']) 
           : [],
+      isPromoted: map['isPromoted'] ?? false,
+      promotionExpiry: map['promotionExpiry'] != null 
+          ? DateTime.parse(map['promotionExpiry']) 
+          : null,
+      // Car fields
+      carMake: map['carMake'],
+      carModel: map['carModel'],
+      carYear: map['carYear'],
+      carFuelType: map['carFuelType'],
+      carTransmission: map['carTransmission'],
+      carMileage: map['carMileage'],
+      carColor: map['carColor'],
+      carCondition: map['carCondition'],
     );
   }
 }

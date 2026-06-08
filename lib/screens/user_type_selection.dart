@@ -1,20 +1,29 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
-import 'admin_dashboard.dart';
+import 'admin_pin_screen.dart';
 import '../utils/constants.dart';
 
-class UserTypeSelection extends StatelessWidget {
-  const UserTypeSelection({super.key});
+class UserTypeSelection extends StatefulWidget {
+  // REMOVED 'const' keyword - StatefulWidget cannot be const
+  UserTypeSelection({super.key});
+
+  @override
+  State<UserTypeSelection> createState() => _UserTypeSelectionState();
+}
+
+class _UserTypeSelectionState extends State<UserTypeSelection> {
+  int _logoPressCount = 0;
+  Timer? _pressTimer;
 
   Future<void> _setUserType(BuildContext context, String type, {bool isAgent = false}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('userType', type);
     
     if (type == 'customer') {
-      // Generate a simple customer ID if not exists
       String? customerId = prefs.getString('customerId');
       if (customerId == null) {
         customerId = 'cust_${DateTime.now().millisecondsSinceEpoch}';
@@ -23,7 +32,7 @@ class UserTypeSelection extends StatelessWidget {
       }
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const HomeScreen(
+        MaterialPageRoute(builder: (context) => HomeScreen(
           toggleTheme: _emptyToggle,
           isDarkMode: false,
         )),
@@ -36,8 +45,35 @@ class UserTypeSelection extends StatelessWidget {
     }
   }
 
-  // Empty toggle function for initial navigation
   static void _emptyToggle() {}
+
+  void _onLogoLongPress() {
+    setState(() {
+      _logoPressCount++;
+    });
+    
+    _pressTimer?.cancel();
+    _pressTimer = Timer(const Duration(seconds: 2), () {
+      setState(() {
+        _logoPressCount = 0;
+      });
+    });
+    
+    if (_logoPressCount >= 5) {
+      _logoPressCount = 0;
+      _pressTimer?.cancel();
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const AdminPinScreen()),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _pressTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +96,7 @@ class UserTypeSelection extends StatelessWidget {
             children: [
               const Spacer(),
               
-              // Logo
+              // Logo with secret admin gesture
               TweenAnimationBuilder(
                 tween: Tween<double>(begin: 0, end: 1),
                 duration: const Duration(milliseconds: 800),
@@ -70,31 +106,33 @@ class UserTypeSelection extends StatelessWidget {
                     child: child,
                   );
                 },
-                child: Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 20,
-                        spreadRadius: 5,
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.home_work,
-                    size: 60,
-                    color: AppConstants.primaryColor,
+                child: GestureDetector(
+                  onLongPress: _onLogoLongPress,
+                  child: Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.2),
+                          blurRadius: 20,
+                          spreadRadius: 5,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.home_work,
+                      size: 60,
+                      color: AppConstants.primaryColor,
+                    ),
                   ),
                 ),
               ),
               
               const SizedBox(height: 32),
               
-              // App Name
               Text(
                 AppConstants.appName,
                 style: GoogleFonts.poppins(
@@ -113,7 +151,6 @@ class UserTypeSelection extends StatelessWidget {
               
               const SizedBox(height: 12),
               
-              // Tagline
               Text(
                 'Find your dream property in Zambia',
                 style: GoogleFonts.poppins(
@@ -196,43 +233,8 @@ class UserTypeSelection extends StatelessWidget {
                 ),
               ),
               
-              const SizedBox(height: 16),
-              
-              // Admin Demo Button (Hidden in production)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const AdminDashboard()),
-                    );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white38),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.admin_panel_settings, size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        'Admin Access',
-                        style: TextStyle(fontSize: 14),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              
               const Spacer(),
               
-              // Version info
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Text(

@@ -1,5 +1,8 @@
 import 'package:hive/hive.dart';
 import '../models/chat.dart';
+import '../models/property.dart';
+import '../models/agent.dart';
+import 'hive_service.dart';
 import 'mock_data_service.dart';
 
 class ChatService {
@@ -87,7 +90,7 @@ class ChatService {
     MessageType type = MessageType.text,
     String? imageUrl,
   }) async {
-    final messageId = '${DateTime.now().millisecondsSinceEpoch}_$senderId';
+    final messageId = '${DateTime.now().millisecondsSinceEpoch}_${senderId}';
     
     final message = ChatMessage(
       id: messageId,

@@ -187,8 +187,6 @@ class AgentAdapter extends TypeAdapter<Agent> {
       profileImageUrl: reader.readString(),
       companyName: reader.readString(),
       tpin: reader.readString(),
-      pacraNumber: reader.readString(),
-      businessLicense: reader.readString(),
       verificationLevel: reader.readString(),
       createdAt: DateTime.parse(reader.readString()),
     );
@@ -204,8 +202,6 @@ class AgentAdapter extends TypeAdapter<Agent> {
     writer.writeString(obj.profileImageUrl ?? '');
     writer.writeString(obj.companyName);
     writer.writeString(obj.tpin ?? '');
-    writer.writeString(obj.pacraNumber ?? '');
-    writer.writeString(obj.businessLicense ?? '');
     writer.writeString(obj.verificationLevel);
     writer.writeString(obj.createdAt?.toIso8601String() ?? DateTime.now().toIso8601String());
   }

@@ -50,6 +50,12 @@ class _HomeScreenState extends State<HomeScreen> {
   void _loadProperties() {
     setState(() {
       _properties = MockDataService.getAllProperties();
+      // Sort: promoted first, then by date
+      _properties.sort((a, b) {
+        if (a.isPromoted && !b.isPromoted) return -1;
+        if (!a.isPromoted && b.isPromoted) return 1;
+        return b.createdAt.compareTo(a.createdAt);
+      });
       _filteredProperties = _properties;
       _isLoading = false;
     });
@@ -162,6 +168,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           const SizedBox(width: 8),
                           _buildFilterChip('Land', _selectedType == PropertyType.land, () {
                             setState(() => _selectedType = PropertyType.land);
+                            _applyFilters();
+                          }),
+                          const SizedBox(width: 8),
+                          _buildFilterChip('Cars', _selectedType == PropertyType.car, () {
+                            setState(() => _selectedType = PropertyType.car);
                             _applyFilters();
                           }),
                           const SizedBox(width: 8),

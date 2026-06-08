@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/property.dart';
 import '../models/agent.dart';
@@ -7,6 +8,7 @@ import '../services/mock_data_service.dart';
 import '../services/whatsapp_service.dart';
 import '../services/chat_service.dart';
 import '../services/customer_service.dart';
+import '../services/supabase_service.dart';
 import '../utils/constants.dart';
 import '../widgets/video_player_widget.dart';
 import '../widgets/three_sixty_viewer.dart';
@@ -35,6 +37,12 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     super.initState();
     _property = widget.property;
     _agent = MockDataService.getAgentById(_property.agentId);
+    _incrementViewCount();
+  }
+
+  Future<void> _incrementViewCount() async {
+    // Increment view count in Hive
+    // In production, also update Supabase
   }
 
   Future<void> _openMaps() async {
@@ -94,6 +102,88 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
         ),
       );
     }
+  }
+
+  String _formatPrice() {
+    final formatter = NumberFormat('#,##0');
+    switch (_property.type) {
+      case PropertyType.rent:
+        return 'ZMW ${formatter.format(_property.price)}/month';
+      case PropertyType.land:
+        return 'ZMW ${formatter.format(_property.price)}';
+      case PropertyType.car:
+        return 'ZMW ${formatter.format(_property.price)}';
+      case PropertyType.buy:
+        return 'ZMW ${formatter.format(_property.price)}';
+    }
+  }
+
+  String _getStatusText() {
+    switch (_property.status) {
+      case PropertyStatus.available:
+        return 'Available';
+      case PropertyStatus.sold:
+        return 'Sold';
+      case PropertyStatus.rented:
+        return 'Rented';
+    }
+  }
+
+  Color _getStatusColor() {
+    switch (_property.status) {
+      case PropertyStatus.available:
+        return Colors.green;
+      case PropertyStatus.sold:
+        return Colors.red;
+      case PropertyStatus.rented:
+        return Colors.orange;
+    }
+  }
+
+  String _getTypeIcon() {
+    switch (_property.type) {
+      case PropertyType.rent:
+        return '🏠';
+      case PropertyType.buy:
+        return '🏡';
+      case PropertyType.land:
+        return '🌾';
+      case PropertyType.car:
+        return '🚗';
+    }
+  }
+
+  String _getTimeAgo() {
+    final difference = DateTime.now().difference(_property.createdAt);
+    if (difference.inDays > 365) {
+      return '${(difference.inDays / 365).floor()} years ago';
+    } else if (difference.inDays > 30) {
+      return '${(difference.inDays / 30).floor()} months ago';
+    } else if (difference.inDays > 0) {
+      return '${difference.inDays} days ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours} hours ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes} minutes ago';
+    } else {
+      return 'Just now';
+    }
+  }
+
+  void _contactAgent() async {
+    if (_agent != null) {
+      await WhatsAppService.contactAgent(_agent!.phone, _property.title);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Agent information not available')),
+      );
+    }
+  }
+
+  void _shareProperty() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Share feature coming soon')),
+    );
   }
 
   @override
@@ -198,7 +288,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                 ),
               ),
             
-            // 360° Photo Tour
+            // 360° Photo Tour - FIXED: Changed Icons.three_sixty to Icons.threesixty
             if (_property.threeSixtyImageUrls.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -207,7 +297,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.threesixty, color: AppConstants.primaryColor),
+                        const Icon(Icons.threesixty, color: AppConstants.primaryColor), // FIXED
                         const SizedBox(width: 8),
                         const Text(
                           '360° Virtual Tour',
@@ -228,6 +318,45 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Type badge
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _getTypeColor().withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: _getTypeColor()),
+                        ),
+                        child: Row(
+                          children: [
+                            Text(_getTypeIcon(), style: const TextStyle(fontSize: 14)),
+                            const SizedBox(width: 4),
+                            Text(
+                              _getTypeText(),
+                              style: TextStyle(color: _getTypeColor()),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _getStatusColor().withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: _getStatusColor()),
+                        ),
+                        child: Text(
+                          _getStatusText(),
+                          style: TextStyle(color: _getStatusColor()),
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
                   // Title
                   Text(
                     _property.title,
@@ -238,28 +367,10 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                   // Price
                   Text(
                     _formatPrice(),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
                       color: AppConstants.primaryColor,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Status badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: _getStatusColor().withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: _getStatusColor()),
-                    ),
-                    child: Text(
-                      _getStatusText(),
-                      style: TextStyle(
-                        color: _getStatusColor(),
-                        fontWeight: FontWeight.bold,
-                      ),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -279,12 +390,30 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                     mainAxisSpacing: 12,
                     children: [
                       _buildDetailCard(Icons.location_on, 'Area', _property.area),
-                      if (_property.type != PropertyType.land) ...[
+                      if (_property.type == PropertyType.car) ...[
+                        if (_property.carMake != null)
+                          _buildDetailCard(Icons.directions_car, 'Make', _property.carMake!),
+                        if (_property.carModel != null)
+                          _buildDetailCard(Icons.model_training, 'Model', _property.carModel!),
+                        if (_property.carYear != null)
+                          _buildDetailCard(Icons.calendar_today, 'Year', _property.carYear!.toString()),
+                        if (_property.carMileage != null)
+                          _buildDetailCard(Icons.speed, 'Mileage', '${_property.carMileage!.toString()} km'),
+                        if (_property.carFuelType != null)
+                          _buildDetailCard(Icons.local_gas_station, 'Fuel', _property.carFuelType!),
+                        if (_property.carTransmission != null)
+                          _buildDetailCard(Icons.settings, 'Transmission', _property.carTransmission!),
+                        if (_property.carColor != null)
+                          _buildDetailCard(Icons.format_paint, 'Color', _property.carColor!),
+                        if (_property.carCondition != null)
+                          _buildDetailCard(Icons.assessment, 'Condition', _property.carCondition!),
+                      ],
+                      if (_property.type != PropertyType.car && _property.type != PropertyType.land) ...[
                         _buildDetailCard(Icons.bed, 'Bedrooms', '${_property.bedrooms}'),
                         _buildDetailCard(Icons.bathtub, 'Bathrooms', '${_property.bathrooms}'),
                       ],
-                      if (_property.landSize != null)
-                        _buildDetailCard(Icons.landscape, 'Land Size', '${_property.landSize} sqm'),
+                      if (_property.type == PropertyType.land && _property.landSize != null)
+                        _buildDetailCard(Icons.landscape, 'Land Size', '${_property.landSize!.toStringAsFixed(0)} sqm'),
                       _buildDetailCard(Icons.visibility, 'Views', '${_property.views}'),
                       _buildDetailCard(Icons.calendar_today, 'Posted', _getTimeAgo()),
                     ],
@@ -444,6 +573,32 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     );
   }
 
+  String _getTypeText() {
+    switch (_property.type) {
+      case PropertyType.rent:
+        return 'FOR RENT';
+      case PropertyType.buy:
+        return 'FOR SALE';
+      case PropertyType.land:
+        return 'LAND';
+      case PropertyType.car:
+        return 'CAR';
+    }
+  }
+
+  Color _getTypeColor() {
+    switch (_property.type) {
+      case PropertyType.rent:
+        return Colors.blue;
+      case PropertyType.buy:
+        return Colors.purple;
+      case PropertyType.land:
+        return Colors.green;
+      case PropertyType.car:
+        return Colors.orange;
+    }
+  }
+
   Widget _buildLocationSection() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
@@ -536,72 +691,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  String _formatPrice() {
-    final formatter = NumberFormat('#,##0');
-    if (_property.type == PropertyType.rent) {
-      return 'ZMW ${formatter.format(_property.price)}/month';
-    } else if (_property.type == PropertyType.land) {
-      return 'ZMW ${formatter.format(_property.price)}';
-    } else {
-      return 'ZMW ${formatter.format(_property.price)}';
-    }
-  }
-
-  String _getStatusText() {
-    switch (_property.status) {
-      case PropertyStatus.available:
-        return 'Available';
-      case PropertyStatus.sold:
-        return 'Sold';
-      case PropertyStatus.rented:
-        return 'Rented';
-    }
-  }
-
-  Color _getStatusColor() {
-    switch (_property.status) {
-      case PropertyStatus.available:
-        return Colors.green;
-      case PropertyStatus.sold:
-        return Colors.red;
-      case PropertyStatus.rented:
-        return Colors.orange;
-    }
-  }
-
-  String _getTimeAgo() {
-    final difference = DateTime.now().difference(_property.createdAt);
-    if (difference.inDays > 365) {
-      return '${(difference.inDays / 365).floor()} years ago';
-    } else if (difference.inDays > 30) {
-      return '${(difference.inDays / 30).floor()} months ago';
-    } else if (difference.inDays > 0) {
-      return '${difference.inDays} days ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours} hours ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes} minutes ago';
-    } else {
-      return 'Just now';
-    }
-  }
-
-  void _contactAgent() async {
-    if (_agent != null) {
-      await WhatsAppService.contactAgent(_agent!.phone, _property.title);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Agent information not available')),
-      );
-    }
-  }
-
-  void _shareProperty() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Share feature coming soon')),
     );
   }
 }

@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace = "com.example.zambia_real_estate"
-    compileSdk = flutter.compileSdkVersion
+    // Force compileSdk to 34 or higher instead of using flutter.compileSdkVersion
+    compileSdk = 34  // Changed from flutter.compileSdkVersion (was 33)
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -20,7 +21,7 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 34  // Changed from flutter.targetSdkVersion to match compileSdk
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

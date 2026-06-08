@@ -127,7 +127,6 @@ class MockDataService {
         profileImageUrl: 'https://randomuser.me/api/portraits/men/32.jpg',
         companyName: 'Zamproperty Real Estate',
         tpin: '1234567890',
-        pacraNumber: '2024/123456',
         verificationLevel: 'verified',
       ),
       Agent(
@@ -139,7 +138,6 @@ class MockDataService {
         profileImageUrl: 'https://randomuser.me/api/portraits/women/68.jpg',
         companyName: 'Lusaka Homes Ltd',
         tpin: null,
-        pacraNumber: null,
         verificationLevel: 'unverified',
       ),
     ];

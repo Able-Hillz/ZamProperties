@@ -6,6 +6,7 @@ import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/agent_dashboard.dart';
 import 'screens/settings_screen.dart';
+import 'screens/agent_verification_screen.dart';  // CHANGED: Use existing file
 import 'utils/constants.dart';
 import 'services/mock_data_service.dart';
 import 'services/sync_service.dart';
@@ -13,16 +14,41 @@ import 'services/theme_service.dart';
 import 'services/chat_service.dart';
 import 'services/rating_service.dart';
 import 'services/complaint_service.dart';
+import 'services/supabase_service.dart';
+import 'services/notification_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'screens/agent_registration_screen.dart'; // Add import
+
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+// Initialize Notifications (skip on web)
+  if (!kIsWeb) {
+    try {
+      await NotificationService.init();
+    } catch (e) {
+      print('⚠️ Notifications not available: $e');
+    }
+  }
+
   // Initialize all services
   await MockDataService.init();
   await ChatService.init();
   await RatingService.init();
   await ComplaintService.init();
   SyncService.startMonitoring();
+  
+  // Initialize Supabase (optional - app works without it)
+  try {
+    await SupabaseService.init();
+    await SupabaseService.pullFromCloud();
+    // SupabaseService.listenToChanges(); // Temporarily disabled
+    print('✅ Supabase connected');
+  } catch (e) {
+    print('⚠️ Supabase not available: $e');
+  }
 
   runApp(const MyApp());
 }
@@ -74,9 +100,10 @@ class _MyAppState extends State<MyApp> {
           foregroundColor: Colors.white,
         ),
         cardColor: Colors.white,
+        dialogBackgroundColor: Colors.white,
         colorScheme: ColorScheme.fromSwatch().copyWith(
           secondary: AppConstants.secondaryColor,
-        ), dialogTheme: const DialogThemeData(backgroundColor: Colors.white),
+        ),
       ),
       darkTheme: ThemeData(
         brightness: Brightness.dark,
@@ -90,21 +117,29 @@ class _MyAppState extends State<MyApp> {
           foregroundColor: Colors.white,
         ),
         cardColor: Colors.grey[850],
+        dialogBackgroundColor: Colors.grey[850],
         colorScheme: ColorScheme.fromSwatch(
           brightness: Brightness.dark,
         ).copyWith(
           secondary: AppConstants.secondaryColor,
-        ), dialogTheme: DialogThemeData(backgroundColor: Colors.grey[850]),
+        ),
       ),
       themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
       initialRoute: '/',
       routes: {
+
+        // In routes:
+        '/agent-registration': (context) => const AgentRegistrationScreen(),
         '/': (context) => SplashScreen(toggleTheme: toggleTheme),
-        '/user-type': (context) => const UserTypeSelection(),
+        '/user-type': (context) => UserTypeSelection(),
         '/home': (context) => HomeScreen(toggleTheme: toggleTheme, isDarkMode: _isDarkMode),
-        '/login': (context) => const LoginScreen(),
+        '/login': (context) => LoginScreen(),
         '/agent-dashboard': (context) => AgentDashboard(toggleTheme: toggleTheme, isDarkMode: _isDarkMode),
-        '/settings': (context) => const SettingsScreen(),
+        '/settings': (context) => SettingsScreen(),
+        '/agent-verification': (context) => const AgentVerificationScreen(  // ADDED with correct name
+          agentId: '',
+          agentPhone: '',
+        ),
       },
     );
   }
@@ -180,7 +215,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             end: Alignment.bottomCenter,
             colors: [
               AppConstants.primaryColor,
-              AppConstants.primaryColor.withValues(alpha: 0.8),
+              AppConstants.primaryColor.withOpacity(0.8),
               isDark ? Colors.grey[900]! : Colors.white,
             ],
             stops: const [0.0, 0.3, 0.8],
@@ -202,13 +237,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.2),
+                          color: Colors.black.withOpacity(0.2),
                           blurRadius: 20,
                           spreadRadius: 5,
                         ),
                       ],
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.home_work,
                       size: 70,
                       color: AppConstants.primaryColor,
@@ -223,7 +258,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       color: Colors.white,
                       shadows: [
                         Shadow(
-                          color: Colors.black.withValues(alpha: 0.3),
+                          color: Colors.black.withOpacity(0.3),
                           blurRadius: 10,
                           offset: const Offset(2, 2),
                         ),
