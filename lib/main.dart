@@ -18,7 +18,7 @@ import 'services/supabase_service.dart';
 import 'services/notification_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'screens/agent_registration_screen.dart'; // Add import
-
+import 'screens/agent_profile_screen.dart';
 
 
 void main() async {
@@ -129,6 +129,7 @@ class _MyAppState extends State<MyApp> {
       routes: {
 
         // In routes:
+        '/agent-profile': (context) => const AgentProfileScreen(),
         '/agent-registration': (context) => const AgentRegistrationScreen(),
         '/': (context) => SplashScreen(toggleTheme: toggleTheme),
         '/user-type': (context) => UserTypeSelection(),
