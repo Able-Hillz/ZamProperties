@@ -17,7 +17,7 @@ dependencies:
   # Image picking
   image_picker: ^1.0.4
 
-  file_picker: ^6.0.0
+  file_picker: ^8.1.4 
   
   #supabase
   supabase_flutter: ^2.0.0
