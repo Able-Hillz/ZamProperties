@@ -1,23 +1,22 @@
-plugins {
-    id "com.android.application"
-    id "dev.flutter.flutter-gradle-plugin"
-}
-
 android {
     namespace = "com.example.zambia_real_estate"
-    compileSdk = 36  // Updated from 34 to 36
+    compileSdk = 36
     
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Add this line to enable desugaring
+        coreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
         applicationId = "com.example.zambia_real_estate"
         minSdk = flutter.minSdkVersion
-        targetSdk = 36  // Updated from 34 to 36
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // Add this for better compatibility
+        multiDexEnabled = true
     }
 
     buildTypes {
@@ -27,6 +26,7 @@ android {
     }
 }
 
-flutter {
-    source = "../.."
+// Add this dependency for desugaring
+dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'
 }
