@@ -29,12 +29,14 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
     final prefs = await SharedPreferences.getInstance();
     final agentId = DateTime.now().millisecondsSinceEpoch.toString();
     
+    // SAVE ALL AGENT DATA (including password for login)
     await prefs.setString('userType', 'agent');
     await prefs.setString('agentId', agentId);
     await prefs.setString('agentName', _nameController.text);
     await prefs.setString('agentPhone', _phoneController.text);
     await prefs.setString('agentEmail', _emailController.text);
     await prefs.setString('agentCompany', _companyController.text);
+    await prefs.setString('agentPassword', _passwordController.text);  // KEY FIX: Save password
     await prefs.setBool('isLoggedIn', true);
     
     if (mounted) {
@@ -58,7 +60,7 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
         backgroundColor: AppConstants.primaryColor,
         foregroundColor: Colors.white,
       ),
-      body: SingleChildScrollView(
+      body: SingleChildScrollView(  // FIX: Add scroll to avoid overflow
         padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
