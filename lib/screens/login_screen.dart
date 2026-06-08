@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/constants.dart';
 import 'agent_dashboard.dart';
-import 'agent_registration_screen.dart';  // CHANGED: Use registration screen
+import 'agent_registration_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,7 +16,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
 
-  // Demo credentials
+  // Demo credentials (store registered agents too)
   final Map<String, String> _demoAgents = {
     '+260977123456': 'password123',
     '+260966789012': 'password123',
@@ -34,12 +34,25 @@ class _LoginScreenState extends State<LoginScreen> {
 
     await Future.delayed(const Duration(seconds: 1));
 
+    // Check registered agents from SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    final registeredPhone = prefs.getString('agentPhone');
+    final registeredPassword = prefs.getString('agentPassword');
+    
+    // Check demo OR registered agent
+    bool isValid = false;
+    
     if (_demoAgents.containsKey(_phoneController.text) &&
         _demoAgents[_phoneController.text] == _passwordController.text) {
-      final prefs = await SharedPreferences.getInstance();
+      isValid = true;
+    } else if (registeredPhone == _phoneController.text && 
+               registeredPassword == _passwordController.text) {
+      isValid = true;
+    }
+    
+    if (isValid) {
       await prefs.setBool('isLoggedIn', true);
       await prefs.setString('agentPhone', _phoneController.text);
-      await prefs.setString('agentId', 'agent1');
       await prefs.setString('userType', 'agent');
       
       if (mounted) {
@@ -67,7 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(  // FIX: Wrap with ScrollView
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -145,7 +158,6 @@ class _LoginScreenState extends State<LoginScreen> {
               
               const SizedBox(height: 16),
               
-              // Register Link - NOW USING REGISTRATION SCREEN
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
