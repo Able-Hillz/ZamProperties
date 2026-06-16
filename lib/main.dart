@@ -1,4 +1,3 @@
-import 'package:zambia_real_estate/screens/agent_dashboard.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,7 +6,7 @@ import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/agent_dashboard.dart';
 import 'screens/settings_screen.dart';
-import 'screens/agent_verification_screen.dart';  // CHANGED: Use existing file
+import 'screens/agent_verification_screen.dart';
 import 'utils/constants.dart';
 import 'services/mock_data_service.dart';
 import 'services/sync_service.dart';
@@ -18,14 +17,13 @@ import 'services/complaint_service.dart';
 import 'services/supabase_service.dart';
 import 'services/notification_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'screens/agent_registration_screen.dart'; // Add import
+import 'screens/agent_registration_screen.dart';
 import 'screens/agent_profile_screen.dart';
-
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-// Initialize Notifications (skip on web)
+  // Initialize Notifications (skip on web)
   if (!kIsWeb) {
     try {
       await NotificationService.init();
@@ -45,7 +43,6 @@ void main() async {
   try {
     await SupabaseService.init();
     await SupabaseService.pullFromCloud();
-    // SupabaseService.listenToChanges(); // Temporarily disabled
     print('✅ Supabase connected');
   } catch (e) {
     print('⚠️ Supabase not available: $e');
@@ -127,21 +124,35 @@ class _MyAppState extends State<MyApp> {
       ),
       themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
       initialRoute: '/',
+      onGenerateRoute: (settings) {
+        // Handle routes with parameters
+        if (settings.name == '/agent-profile') {
+          final args = settings.arguments as Map<String, dynamic>?;
+          return MaterialPageRoute(
+            builder: (context) => AgentProfileScreen(
+              agentId: args?['agentId'] ?? '',
+            ),
+          );
+        }
+        if (settings.name == '/agent-verification') {
+          final args = settings.arguments as Map<String, dynamic>?;
+          return MaterialPageRoute(
+            builder: (context) => AgentVerificationScreen(
+              agentId: args?['agentId'] ?? '',
+              agentPhone: args?['agentPhone'] ?? '',
+            ),
+          );
+        }
+        return null;
+      },
       routes: {
-
-        // In routes:
-        '/agent-profile': (context) => const AgentProfileScreen(),
-        '/agent-registration': (context) => const AgentRegistrationScreen(),
         '/': (context) => SplashScreen(toggleTheme: toggleTheme),
         '/user-type': (context) => UserTypeSelection(),
         '/home': (context) => HomeScreen(toggleTheme: toggleTheme, isDarkMode: _isDarkMode),
-        '/login': (context) => LoginScreen(),
+        '/login': (context) => const LoginScreen(),
         '/agent-dashboard': (context) => AgentDashboard(toggleTheme: toggleTheme, isDarkMode: _isDarkMode),
-        '/settings': (context) => SettingsScreen(),
-        '/agent-verification': (context) => const AgentVerificationScreen(  // ADDED with correct name
-          agentId: '',
-          agentPhone: '',
-        ),
+        '/settings': (context) => const SettingsScreen(),
+        '/agent-registration': (context) => const AgentRegistrationScreen(),
       },
     );
   }
