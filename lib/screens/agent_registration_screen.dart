@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/constants.dart';
-import 'agent_verification_screen.dart';
+import '../services/hive_service.dart';
+import '../models/agent.dart';
+import 'agent_dashboard.dart';
+import '../services/supabase_service.dart';
 
 class AgentRegistrationScreen extends StatefulWidget {
   const AgentRegistrationScreen({super.key});
@@ -18,66 +21,99 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
   final _companyController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _licenseController = TextEditingController();  // Now REQUIRED
+  final _whatsappController = TextEditingController();
   
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _whatsappSameAsPhone = true;
 
-  Future<void> _register() async {
-    if (!_formKey.currentState!.validate()) return;
-    
-    setState(() => _isLoading = true);
-    
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    final prefs = await SharedPreferences.getInstance();
-    final agentId = DateTime.now().millisecondsSinceEpoch.toString();
-    
-    // Check if phone already registered
-    final existingPhone = prefs.getString('agentPhone');
-    if (existingPhone == _phoneController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This phone number is already registered')),
-      );
-      setState(() => _isLoading = false);
-      return;
-    }
-    
-    // Save all agent data
-    await prefs.setBool('isRegistered', true);
-    await prefs.setString('userType', 'agent');
-    await prefs.setString('agentId', agentId);
-    await prefs.setString('agentName', _nameController.text);
-    await prefs.setString('agentPhone', _phoneController.text);
-    await prefs.setString('agentEmail', _emailController.text);
-    await prefs.setString('agentCompany', _companyController.text);
-    await prefs.setString('agentPassword', _passwordController.text);
-    await prefs.setInt('agentTrustPoints', 50);
-    await prefs.setBool('agentHasTPIN', false);
-    await prefs.setBool('isLoggedIn', true);
-    
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Registration successful!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => AgentVerificationScreen(
-            agentId: agentId,
-            agentPhone: _phoneController.text,
-          ),
-        ),
-      );
-    }
-    
+  Future<void> _registerAndLogin() async {
+  if (!_formKey.currentState!.validate()) return;
+  
+  setState(() => _isLoading = true);
+  
+  await Future.delayed(const Duration(milliseconds: 500));
+  
+  final prefs = await SharedPreferences.getInstance();
+  final agentId = DateTime.now().millisecondsSinceEpoch.toString();
+  
+  // Check if phone already registered
+  final existingPhone = prefs.getString('agentPhone');
+  if (existingPhone == _phoneController.text) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('This phone number is already registered')),
+    );
     setState(() => _isLoading = false);
+    return;
   }
+  
+  // Determine WhatsApp number
+  final whatsappNumber = _whatsappSameAsPhone 
+      ? _phoneController.text 
+      : _whatsappController.text;
+  
+  // Create Agent object
+  final agent = Agent(
+    id: agentId,
+    name: _nameController.text,
+    phone: _phoneController.text,
+    whatsapp: whatsappNumber,
+    email: _emailController.text.isNotEmpty ? _emailController.text : null,
+    isVerified: false,
+    profileImageUrl: null,
+    companyName: _companyController.text.isNotEmpty ? _companyController.text : 'Independent Agent',
+    tpin: null,
+    licenseNumber: _licenseController.text,
+    passwordHash: _passwordController.text,
+    trustPoints: 75,
+    verificationLevel: 'basicVerified',
+    averageRating: 0.0,
+    totalReviews: 0,
+    createdAt: DateTime.now(),
+  );
+  
+  // Save to Hive (local)
+  await HiveService.saveAgent(agent);
+  
+  // Sync to Supabase (cloud) - FIXED: Added this!
+  if (SupabaseService.isAvailable) {
+    await SupabaseService.syncLocalToCloud();
+  }
+  
+  // Save to SharedPreferences for quick access
+  await prefs.setBool('isRegistered', true);
+  await prefs.setString('userType', 'agent');
+  await prefs.setString('agentId', agentId);
+  await prefs.setString('agentName', _nameController.text);
+  await prefs.setString('agentPhone', _phoneController.text);
+  await prefs.setString('agentPassword', _passwordController.text);
+  await prefs.setString('agentCompany', _companyController.text.isNotEmpty ? _companyController.text : 'Independent Agent');
+  await prefs.setString('agentEmail', _emailController.text);
+  await prefs.setBool('isLoggedIn', true);
+  
+  if (mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Registration successful! Welcome aboard!'),
+        backgroundColor: Colors.green,
+      ),
+    );
+    
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AgentDashboard(
+          toggleTheme: () {},
+          isDarkMode: false,
+        ),
+      ),
+    );
+  }
+  
+  setState(() => _isLoading = false);
+}
 
   @override
   Widget build(BuildContext context) {
@@ -123,6 +159,7 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
               ),
               const SizedBox(height: 32),
               
+              // Full Name
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
@@ -134,6 +171,7 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
               ),
               const SizedBox(height: 16),
               
+              // Phone Number
               TextFormField(
                 controller: _phoneController,
                 decoration: const InputDecoration(
@@ -151,33 +189,76 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
               ),
               const SizedBox(height: 16),
               
+              // Company Name (Optional)
+              TextFormField(
+                controller: _companyController,
+                decoration: const InputDecoration(
+                  labelText: 'Company Name (Optional)',
+                  prefixIcon: Icon(Icons.business),
+                  border: OutlineInputBorder(),
+                  helperText: 'Leave blank if you\'re an independent agent',
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Email (Optional)
               TextFormField(
                 controller: _emailController,
                 decoration: const InputDecoration(
-                  labelText: 'Email *',
+                  labelText: 'Email (Optional)',
                   prefixIcon: Icon(Icons.email),
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 16),
+              
+              // Agent License Number (REQUIRED)
+              TextFormField(
+                controller: _licenseController,
+                decoration: const InputDecoration(
+                  labelText: 'Agent License Number *',
+                  prefixIcon: Icon(Icons.badge),
+                  border: OutlineInputBorder(),
+                  helperText: 'Your TPIN or REAZ license number',
+                ),
                 validator: (v) {
-                  if (v == null || v.isEmpty) return 'Enter email';
-                  if (!v.contains('@') || !v.contains('.')) return 'Enter valid email';
+                  if (v == null || v.isEmpty) return 'License number is required';
+                  if (v.length < 5) return 'Enter valid license number';
                   return null;
                 },
               ),
               const SizedBox(height: 16),
               
-              TextFormField(
-                controller: _companyController,
-                decoration: const InputDecoration(
-                  labelText: 'Company Name *',
-                  prefixIcon: Icon(Icons.business),
-                  border: OutlineInputBorder(),
-                ),
-                validator: (v) => v == null || v.isEmpty ? 'Enter company name' : null,
+              // WhatsApp Number
+              CheckboxListTile(
+                value: _whatsappSameAsPhone,
+                onChanged: (value) {
+                  setState(() {
+                    _whatsappSameAsPhone = value ?? true;
+                  });
+                },
+                title: const Text('Use same number for WhatsApp'),
+                subtitle: Text('Phone: ${_phoneController.text.isNotEmpty ? _phoneController.text : 'Enter phone number first'}'),
+                controlAffinity: ListTileControlAffinity.leading,
+                activeColor: AppConstants.primaryColor,
               ),
-              const SizedBox(height: 16),
               
+              if (!_whatsappSameAsPhone)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: TextFormField(
+                    controller: _whatsappController,
+                    decoration: const InputDecoration(
+                      labelText: 'WhatsApp Number',
+                      prefixIcon: Icon(Icons.chat),
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.phone,
+                  ),
+                ),
+              
+              // Password
               TextFormField(
                 controller: _passwordController,
                 obscureText: _obscurePassword,
@@ -203,6 +284,7 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
               ),
               const SizedBox(height: 16),
               
+              // Confirm Password
               TextFormField(
                 controller: _confirmPasswordController,
                 obscureText: _obscureConfirmPassword,
@@ -226,11 +308,12 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
               ),
               const SizedBox(height: 32),
               
+              // Register Button
               SizedBox(
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: _isLoading ? null : _register,
+                  onPressed: _isLoading ? null : _registerAndLogin,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppConstants.primaryColor,
                     shape: RoundedRectangleBorder(
@@ -247,7 +330,7 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
                           ),
                         )
                       : const Text(
-                          'Register',
+                          'Register & Continue',
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                 ),
@@ -274,6 +357,28 @@ class _AgentRegistrationScreenState extends State<AgentRegistrationScreen> {
                 ],
               ),
               const SizedBox(height: 20),
+              
+              // Info Box
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.star, color: Colors.amber.shade700),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'License verification adds trust points to your profile! You can add TPIN later for even more trust.',
+                        style: TextStyle(fontSize: 12, color: Colors.green.shade700),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
