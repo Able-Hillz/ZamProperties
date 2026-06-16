@@ -2,10 +2,13 @@ import '../models/property.dart';
 import '../models/agent.dart';
 import 'hive_service.dart';
 
+/// Mock data service that handles all property and agent data operations
+/// Uses Hive for persistent local storage
 class MockDataService {
   static List<Property> _mockProperties = [];
   static List<Agent> _mockAgents = [];
 
+  /// Initialize the service - loads from Hive cache or creates mock data
   static Future<void> init() async {
     // Initialize Hive first
     await HiveService.init();
@@ -29,6 +32,7 @@ class MockDataService {
     }
   }
 
+  /// Initialize mock property data
   static void _initMockData() {
     _mockProperties = [
       Property(
@@ -116,6 +120,7 @@ class MockDataService {
     ];
   }
 
+  /// Initialize mock agent data
   static void _initMockAgents() {
     _mockAgents = [
       Agent(
@@ -143,14 +148,17 @@ class MockDataService {
     ];
   }
 
+  /// Get all properties
   static List<Property> getAllProperties() {
     return _mockProperties;
   }
 
+  /// Get properties by type
   static List<Property> getPropertiesByType(PropertyType type) {
     return _mockProperties.where((p) => p.type == type).toList();
   }
 
+  /// Get property by ID
   static Property? getPropertyById(String id) {
     try {
       return _mockProperties.firstWhere((p) => p.id == id);
@@ -159,6 +167,7 @@ class MockDataService {
     }
   }
 
+  /// Get agent by ID
   static Agent? getAgentById(String id) {
     try {
       return _mockAgents.firstWhere((a) => a.id == id);
@@ -167,6 +176,7 @@ class MockDataService {
     }
   }
 
+  /// Filter properties by type, area, and max price
   static List<Property> filterProperties({
     PropertyType? type,
     String? area,
@@ -180,12 +190,24 @@ class MockDataService {
     }).toList();
   }
 
+  /// Add a new property
   static Future<void> addProperty(Property property) async {
     _mockProperties.insert(0, property);
     await HiveService.addProperty(property);
     print('✅ Property added and saved to Hive: ${property.title}');
   }
 
+  /// UPDATE PROPERTY - Edit existing property
+  static Future<void> updateProperty(Property property) async {
+    final index = _mockProperties.indexWhere((p) => p.id == property.id);
+    if (index != -1) {
+      _mockProperties[index] = property;
+      await HiveService.updateProperty(property);
+      print('✅ Property updated: ${property.title}');
+    }
+  }
+
+  /// Update property status (Available, Sold, Rented)
   static Future<void> updatePropertyStatus(String propertyId, PropertyStatus newStatus) async {
     final index = _mockProperties.indexWhere((p) => p.id == propertyId);
     if (index != -1) {
@@ -210,6 +232,16 @@ class MockDataService {
       );
       await HiveService.updateProperty(_mockProperties[index]);
       print('✅ Property status updated: ${updated.title} -> ${newStatus.toString()}');
+    }
+  }
+
+  /// DELETE PROPERTY - Remove a property completely
+  static Future<void> deleteProperty(String propertyId) async {
+    final index = _mockProperties.indexWhere((p) => p.id == propertyId);
+    if (index != -1) {
+      _mockProperties.removeAt(index);
+      await HiveService.deleteProperty(propertyId);
+      print('✅ Property deleted: $propertyId');
     }
   }
 }
