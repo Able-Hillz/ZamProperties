@@ -14,17 +14,14 @@ class HiveService {
     if (_isInitialized) return;
     
     if (kIsWeb) {
-      // Web: Use default directory (works automatically)
       Hive.init('');
       print('✅ Hive initialized for Web');
     } else {
-      // Mobile/Desktop: Use app documents directory
       final appDocumentDir = await getApplicationDocumentsDirectory();
       Hive.init(appDocumentDir.path);
-      print('✅ Hive initialized for Mobile at ${appDocumentDir.path}');
+      print('✅ Hive initialized for Mobile');
     }
     
-    // Register adapters
     if (!Hive.isAdapterRegistered(0)) {
       Hive.registerAdapter(PropertyAdapter());
     }
@@ -32,7 +29,6 @@ class HiveService {
       Hive.registerAdapter(AgentAdapter());
     }
     
-    // Open boxes
     _propertiesBox = await Hive.openBox('properties');
     _agentsBox = await Hive.openBox('agents');
     _settingsBox = await Hive.openBox('settings');
@@ -45,12 +41,10 @@ class HiveService {
   
   static Future<void> saveProperties(List<Property> properties) async {
     if (!_isInitialized) await init();
-    
     await _propertiesBox.clear();
     for (var property in properties) {
       await _propertiesBox.put(property.id, property);
     }
-    
     await _settingsBox.put('lastSync', DateTime.now().toIso8601String());
     print('✅ Saved ${properties.length} properties to Hive');
   }
@@ -85,6 +79,7 @@ class HiveService {
   static Future<void> saveAgent(Agent agent) async {
     if (!_isInitialized) await init();
     await _agentsBox.put(agent.id, agent);
+    print('✅ Agent saved to Hive: ${agent.name}');
   }
   
   static Agent? getAgent(String id) {
@@ -123,8 +118,7 @@ class HiveService {
   }
 }
 
-// ============ HIVE ADAPTERS ============
-
+// ============ PROPERTY ADAPTER ============
 class PropertyAdapter extends TypeAdapter<Property> {
   @override
   final int typeId = 0;
@@ -148,6 +142,19 @@ class PropertyAdapter extends TypeAdapter<Property> {
       views: reader.readInt(),
       locationAddress: reader.readString(),
       googleMapsLink: reader.readString(),
+      videoUrl: reader.readString(),
+      videoThumbnailUrl: reader.readString(),
+      threeSixtyImageUrls: reader.readStringList(),
+      isPromoted: reader.readBool(),
+      promotionExpiry: reader.readBool() ? DateTime.parse(reader.readString()) : null,
+      carMake: reader.readString(),
+      carModel: reader.readString(),
+      carYear: reader.readInt(),
+      carFuelType: reader.readString(),
+      carTransmission: reader.readString(),
+      carMileage: reader.readInt(),
+      carColor: reader.readString(),
+      carCondition: reader.readString(),
     );
   }
 
@@ -169,9 +176,26 @@ class PropertyAdapter extends TypeAdapter<Property> {
     writer.writeInt(obj.views);
     writer.writeString(obj.locationAddress ?? '');
     writer.writeString(obj.googleMapsLink ?? '');
+    writer.writeString(obj.videoUrl ?? '');
+    writer.writeString(obj.videoThumbnailUrl ?? '');
+    writer.writeStringList(obj.threeSixtyImageUrls);
+    writer.writeBool(obj.isPromoted);
+    writer.writeBool(obj.promotionExpiry != null);
+    if (obj.promotionExpiry != null) {
+      writer.writeString(obj.promotionExpiry!.toIso8601String());
+    }
+    writer.writeString(obj.carMake ?? '');
+    writer.writeString(obj.carModel ?? '');
+    writer.writeInt(obj.carYear ?? 0);
+    writer.writeString(obj.carFuelType ?? '');
+    writer.writeString(obj.carTransmission ?? '');
+    writer.writeInt(obj.carMileage ?? 0);
+    writer.writeString(obj.carColor ?? '');
+    writer.writeString(obj.carCondition ?? '');
   }
 }
 
+// ============ AGENT ADAPTER ============
 class AgentAdapter extends TypeAdapter<Agent> {
   @override
   final int typeId = 1;
@@ -182,12 +206,18 @@ class AgentAdapter extends TypeAdapter<Agent> {
       id: reader.readString(),
       name: reader.readString(),
       phone: reader.readString(),
+      whatsapp: reader.readString(),
       email: reader.readString(),
       isVerified: reader.readBool(),
       profileImageUrl: reader.readString(),
       companyName: reader.readString(),
       tpin: reader.readString(),
+      licenseNumber: reader.readString(),
+      passwordHash: reader.readString(),
+      trustPoints: reader.readInt(),
       verificationLevel: reader.readString(),
+      averageRating: reader.readDouble(),
+      totalReviews: reader.readInt(),
       createdAt: DateTime.parse(reader.readString()),
     );
   }
@@ -197,12 +227,18 @@ class AgentAdapter extends TypeAdapter<Agent> {
     writer.writeString(obj.id);
     writer.writeString(obj.name);
     writer.writeString(obj.phone);
+    writer.writeString(obj.whatsapp ?? '');
     writer.writeString(obj.email ?? '');
     writer.writeBool(obj.isVerified);
     writer.writeString(obj.profileImageUrl ?? '');
     writer.writeString(obj.companyName);
     writer.writeString(obj.tpin ?? '');
+    writer.writeString(obj.licenseNumber ?? '');
+    writer.writeString(obj.passwordHash ?? '');
+    writer.writeInt(obj.trustPoints);
     writer.writeString(obj.verificationLevel);
+    writer.writeDouble(obj.averageRating);
+    writer.writeInt(obj.totalReviews);
     writer.writeString(obj.createdAt?.toIso8601String() ?? DateTime.now().toIso8601String());
   }
 }
