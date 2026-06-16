@@ -1,15 +1,17 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import '../models/property.dart';
 import '../utils/constants.dart';
 import '../utils/zambia_areas.dart';
 import '../services/supabase_service.dart';
 import '../services/mock_data_service.dart';
 
+/// Screen for adding new properties or editing existing ones
 class AddPropertyScreen extends StatefulWidget {
-  const AddPropertyScreen({super.key});
+  final Property? propertyToEdit; // If provided, we're in edit mode
+
+  const AddPropertyScreen({super.key, this.propertyToEdit});
 
   @override
   State<AddPropertyScreen> createState() => _AddPropertyScreenState();
@@ -18,7 +20,7 @@ class AddPropertyScreen extends StatefulWidget {
 class _AddPropertyScreenState extends State<AddPropertyScreen> {
   final _formKey = GlobalKey<FormState>();
   
-  // Controllers
+  // Text controllers
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _priceController = TextEditingController();
@@ -42,10 +44,15 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   String? _carTransmission;
   String? _carCondition;
   
-  final List<XFile> _selectedImages = [];
+  // Images and media
+  List<XFile> _selectedImages = [];
   final ImagePicker _picker = ImagePicker();
   bool _isSubmitting = false;
   bool _addMapsLink = false;
+  
+  // Edit mode flags
+  bool _isEditing = false;
+  String _editingPropertyId = '';
   
   // Video walkthrough
   XFile? _videoFile;
@@ -54,17 +61,53 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
   bool _hasVideo = false;
   
   // 360° Photo Tour
-  final List<XFile> _threeSixtyImages = [];
+  List<XFile> _threeSixtyImages = [];
   bool _hasThreeSixtyTour = false;
 
-  // Fuel type options
+  // Dropdown options
   final List<String> _fuelTypes = ['Petrol', 'Diesel', 'Electric', 'Hybrid', 'LPG'];
-  
-  // Transmission options
   final List<String> _transmissions = ['Manual', 'Automatic', 'CVT', 'Semi-Automatic'];
-  
-  // Condition options
   final List<String> _conditions = ['Brand New', 'Like New', 'Very Good', 'Good', 'Fair', 'Needs Work'];
+
+  @override
+  void initState() {
+    super.initState();
+    // Check if we're editing an existing property
+    _isEditing = widget.propertyToEdit != null;
+    if (_isEditing) {
+      _loadPropertyData();
+    }
+  }
+
+  /// Load existing property data into form fields for editing
+  void _loadPropertyData() {
+    final property = widget.propertyToEdit!;
+    _titleController.text = property.title;
+    _descriptionController.text = property.description;
+    _priceController.text = property.price.toString();
+    _selectedArea = property.area;
+    _selectedType = property.type;
+    _bedroomsController.text = property.bedrooms.toString();
+    _bathroomsController.text = property.bathrooms.toString();
+    if (property.landSize != null) {
+      _landSizeController.text = property.landSize!.toString();
+    }
+    _locationAddressController.text = property.locationAddress ?? '';
+    _googleMapsLinkController.text = property.googleMapsLink ?? '';
+    _editingPropertyId = property.id;
+    
+    // Load car-specific fields if applicable
+    if (property.type == PropertyType.car) {
+      _carMakeController.text = property.carMake ?? '';
+      _carModelController.text = property.carModel ?? '';
+      _carYearController.text = property.carYear?.toString() ?? '';
+      _carMileageController.text = property.carMileage?.toString() ?? '';
+      _carColorController.text = property.carColor ?? '';
+      _carFuelType = property.carFuelType;
+      _carTransmission = property.carTransmission;
+      _carCondition = property.carCondition;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,11 +118,11 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
       appBar: AppBar(
         backgroundColor: AppConstants.primaryColor,
         elevation: 0,
-        title: const Text('Add New Listing'),
+        title: Text(_isEditing ? 'Edit Listing' : 'Add New Listing'),
         actions: [
           TextButton(
             onPressed: _isSubmitting ? null : _submitProperty,
-            child: const Text('Post', style: TextStyle(color: Colors.white)),
+            child: Text(_isEditing ? 'Update' : 'Post', style: const TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -91,10 +134,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Property type selector
-              const Text(
-                'Listing Type *',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
+              const Text('Listing Type *', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               SegmentedButton<PropertyType>(
                 segments: const [
@@ -105,9 +145,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                 ],
                 selected: {_selectedType},
                 onSelectionChanged: (Set<PropertyType> selection) {
-                  setState(() {
-                    _selectedType = selection.first;
-                  });
+                  setState(() => _selectedType = selection.first);
                 },
               ),
               const SizedBox(height: 16),
@@ -116,18 +154,14 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
               TextFormField(
                 controller: _titleController,
                 decoration: InputDecoration(
-                  labelText: _selectedType == PropertyType.car 
-                      ? 'Car Title *' 
-                      : 'Property Title *',
+                  labelText: _selectedType == PropertyType.car ? 'Car Title *' : 'Property Title *',
                   hintText: _selectedType == PropertyType.car 
                       ? 'e.g., Toyota Hilux 2022, 4x4'
                       : 'e.g., Modern 3-Bedroom House in Woodlands',
                   border: const OutlineInputBorder(),
                 ),
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a title';
-                  }
+                  if (value == null || value.isEmpty) return 'Please enter a title';
                   return null;
                 },
               ),
@@ -143,9 +177,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a description';
-                  }
+                  if (value == null || value.isEmpty) return 'Please enter a description';
                   return null;
                 },
               ),
@@ -156,27 +188,19 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                 controller: _priceController,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
-                  labelText: _selectedType == PropertyType.rent 
-                      ? 'Monthly Rent (ZMW) *' 
-                      : _selectedType == PropertyType.car
-                          ? 'Price (ZMW) *'
-                          : 'Price (ZMW) *',
+                  labelText: _selectedType == PropertyType.rent ? 'Monthly Rent (ZMW) *' : 'Price (ZMW) *',
                   prefixText: 'ZMW ',
                   border: const OutlineInputBorder(),
                 ),
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a price';
-                  }
-                  if (double.tryParse(value) == null) {
-                    return 'Please enter a valid number';
-                  }
+                  if (value == null || value.isEmpty) return 'Please enter a price';
+                  if (double.tryParse(value) == null) return 'Please enter a valid number';
                   return null;
                 },
               ),
               const SizedBox(height: 16),
               
-              // Area (for all types, cars also have location)
+              // Area (for all types)
               DropdownButtonFormField<String>(
                 value: _selectedArea,
                 decoration: const InputDecoration(
@@ -186,15 +210,9 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                 items: ZambiaAreas.getAllAreas().map((area) {
                   return DropdownMenuItem(value: area, child: Text(area));
                 }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedArea = value;
-                  });
-                },
+                onChanged: (value) => setState(() => _selectedArea = value),
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please select an area';
-                  }
+                  if (value == null || value.isEmpty) return 'Please select an area';
                   return null;
                 },
               ),
@@ -257,10 +275,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
               
               // Car-specific fields
               if (_selectedType == PropertyType.car) ...[
-                const Text(
-                  'Vehicle Details',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
+                const Text('Vehicle Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 16),
                 
                 Row(
@@ -345,14 +360,8 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                     labelText: 'Fuel Type *',
                     border: OutlineInputBorder(),
                   ),
-                  items: _fuelTypes.map((type) {
-                    return DropdownMenuItem(value: type, child: Text(type));
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _carFuelType = value;
-                    });
-                  },
+                  items: _fuelTypes.map((type) => DropdownMenuItem(value: type, child: Text(type))).toList(),
+                  onChanged: (value) => setState(() => _carFuelType = value),
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Required';
                     return null;
@@ -366,14 +375,8 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                     labelText: 'Transmission *',
                     border: OutlineInputBorder(),
                   ),
-                  items: _transmissions.map((type) {
-                    return DropdownMenuItem(value: type, child: Text(type));
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _carTransmission = value;
-                    });
-                  },
+                  items: _transmissions.map((type) => DropdownMenuItem(value: type, child: Text(type))).toList(),
+                  onChanged: (value) => setState(() => _carTransmission = value),
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Required';
                     return null;
@@ -397,14 +400,8 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                     labelText: 'Condition *',
                     border: OutlineInputBorder(),
                   ),
-                  items: _conditions.map((condition) {
-                    return DropdownMenuItem(value: condition, child: Text(condition));
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _carCondition = value;
-                    });
-                  },
+                  items: _conditions.map((condition) => DropdownMenuItem(value: condition, child: Text(condition))).toList(),
+                  onChanged: (value) => setState(() => _carCondition = value),
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Required';
                     return null;
@@ -414,10 +411,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
               ],
               
               // Location Address
-              const Text(
-                'Location Address *',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
+              const Text('Location Address *', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _locationAddressController,
@@ -428,9 +422,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                 ),
                 maxLines: 2,
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter location address';
-                  }
+                  if (value == null || value.isEmpty) return 'Please enter location address';
                   return null;
                 },
               ),
@@ -441,11 +433,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                 title: const Text('Add Google Maps Link'),
                 subtitle: const Text('Share exact location via Google Maps'),
                 value: _addMapsLink,
-                onChanged: (value) {
-                  setState(() {
-                    _addMapsLink = value ?? false;
-                  });
-                },
+                onChanged: (value) => setState(() => _addMapsLink = value ?? false),
               ),
               
               if (_addMapsLink) ...[
@@ -461,10 +449,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                  decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(8)),
                   child: Row(
                     children: [
                       Icon(Icons.info, color: Colors.blue[700], size: 16),
@@ -482,10 +467,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
               const SizedBox(height: 16),
               
               // Photos
-              const Text(
-                'Photos *',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
+              const Text('Photos *', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               SizedBox(
                 height: 120,
@@ -532,17 +514,10 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                           top: 4,
                           right: 12,
                           child: GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _selectedImages.removeAt(index);
-                              });
-                            },
+                            onTap: () => setState(() => _selectedImages.removeAt(index)),
                             child: Container(
                               padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
-                              ),
+                              decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
                               child: const Icon(Icons.close, size: 16, color: Colors.white),
                             ),
                           ),
@@ -550,166 +525,6 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                       ],
                     );
                   },
-                ),
-              ),
-              
-              // Video Walkthrough
-              const SizedBox(height: 24),
-              const Text(
-                'Video Walkthrough (Optional)',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.grey[800] : Colors.grey[50],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
-                ),
-                child: Column(
-                  children: [
-                    if (!_hasVideo)
-                      Column(
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: _isUploadingVideo ? null : _pickVideo,
-                            icon: const Icon(Icons.videocam),
-                            label: const Text('Record or Upload Video Tour'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppConstants.primaryColor,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Upload a 30-second walkthrough video',
-                            style: TextStyle(fontSize: 12, color: isDark ? Colors.grey[400] : Colors.grey[600]),
-                          ),
-                          if (_isUploadingVideo) ...[
-                            const SizedBox(height: 12),
-                            const LinearProgressIndicator(),
-                            const SizedBox(height: 4),
-                            const Text('Processing video...', style: TextStyle(fontSize: 12)),
-                          ],
-                        ],
-                      )
-                    else
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.green[50],
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.green[200]!),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.check_circle, color: Colors.green),
-                            const SizedBox(width: 12),
-                            const Expanded(child: Text('Video uploaded successfully!')),
-                            IconButton(
-                              icon: const Icon(Icons.close, color: Colors.red),
-                              onPressed: () {
-                                setState(() {
-                                  _videoFile = null;
-                                  _videoThumbnail = null;
-                                  _hasVideo = false;
-                                });
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              
-              // 360° Photo Tour
-              const SizedBox(height: 16),
-              const Text(
-                '360° Photo Tour (Optional)',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.grey[800] : Colors.grey[50],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
-                ),
-                child: Column(
-                  children: [
-                    if (!_hasThreeSixtyTour)
-                      Column(
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: _pickThreeSixtyImages,
-                            icon: const Icon(Icons.photo_library),
-                            label: const Text('Select 360° Photos'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppConstants.secondaryColor,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Take photos around the room/car for 360° view',
-                            style: TextStyle(fontSize: 12, color: isDark ? Colors.grey[400] : Colors.grey[600]),
-                          ),
-                        ],
-                      )
-                    else
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.green[50],
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.green[200]!),
-                        ),
-                        child: Column(
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.check_circle, color: Colors.green),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text('${_threeSixtyImages.length} 360° photos uploaded'),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.close, color: Colors.red),
-                                  onPressed: () {
-                                    setState(() {
-                                      _threeSixtyImages.clear();
-                                      _hasThreeSixtyTour = false;
-                                    });
-                                  },
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            SizedBox(
-                              height: 60,
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: _threeSixtyImages.length,
-                                itemBuilder: (context, index) {
-                                  return Container(
-                                    width: 60,
-                                    margin: const EdgeInsets.only(right: 8),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(8),
-                                      image: DecorationImage(
-                                        image: FileImage(File(_threeSixtyImages[index].path)),
-                                        fit: BoxFit.cover,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
                 ),
               ),
               
@@ -721,82 +536,35 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
     );
   }
 
+  /// Pick multiple images from gallery
   Future<void> _pickImages() async {
-    final List<XFile> images = await _picker.pickMultiImage();
-    if (images.isNotEmpty) {
-      setState(() {
-        _selectedImages.addAll(images);
-      });
-    }
+    final images = await _picker.pickMultiImage();
+    if (images.isNotEmpty) setState(() => _selectedImages.addAll(images));
   }
 
-  Future<void> _pickVideo() async {
-    setState(() => _isUploadingVideo = true);
-    
-    try {
-      final XFile? video = await _picker.pickVideo(
-        source: ImageSource.gallery,
-        maxDuration: const Duration(seconds: 30),
-      );
-      
-      if (video != null) {
-        setState(() {
-          _videoFile = video;
-          _hasVideo = true;
-        });
-        
-        // Thumbnail generation commented out for now
-        setState(() {
-          _videoThumbnail = null;
-        });
-      }
-    } catch (e) {
-      print('Error picking video: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
-    } finally {
-      setState(() => _isUploadingVideo = false);
-    }
-  }
-
-  Future<void> _pickThreeSixtyImages() async {
-    final List<XFile> images = await _picker.pickMultiImage();
-    if (images.isNotEmpty) {
-      setState(() {
-        _threeSixtyImages.addAll(images);
-        _hasThreeSixtyTour = true;
-      });
-    }
-  }
-
+  /// Submit property - handles both add and edit
   Future<void> _submitProperty() async {
     if (_formKey.currentState!.validate() && _selectedArea != null) {
       setState(() => _isSubmitting = true);
       
-      final propertyId = DateTime.now().millisecondsSinceEpoch.toString();
+      final propertyId = _isEditing 
+          ? _editingPropertyId 
+          : DateTime.now().millisecondsSinceEpoch.toString();
       
-      // Upload images to Supabase
       List<String> uploadedImageUrls = [];
-      List<File> imageFiles = _selectedImages.map((xfile) => File(xfile.path)).toList();
       
-      if (imageFiles.isNotEmpty) {
-        uploadedImageUrls = await SupabaseService.uploadImages(imageFiles, propertyId);
+      // Only upload new images if adding new property
+      if (!_isEditing && _selectedImages.isNotEmpty) {
+        uploadedImageUrls = await SupabaseService.uploadImages(_selectedImages, propertyId);
+      } else if (_isEditing) {
+        uploadedImageUrls = widget.propertyToEdit!.imageUrls;
       }
       
-      if (uploadedImageUrls.isEmpty) {
+      if (uploadedImageUrls.isEmpty && !_isEditing) {
         uploadedImageUrls.add('https://picsum.photos/id/106/400/300');
       }
       
-      // Upload video if exists
-      String? uploadedVideoUrl;
-      if (_videoFile != null) {
-        uploadedVideoUrl = await SupabaseService.uploadVideo(File(_videoFile!.path), propertyId);
-      }
-      
-      final newProperty = Property(
+      final property = Property(
         id: propertyId,
         agentId: 'agent1',
         title: _titleController.text,
@@ -804,21 +572,18 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         price: double.parse(_priceController.text),
         area: _selectedArea!,
         type: _selectedType,
-        status: PropertyStatus.available,
+        status: _isEditing ? widget.propertyToEdit!.status : PropertyStatus.available,
         imageUrls: uploadedImageUrls,
         bedrooms: _selectedType == PropertyType.land || _selectedType == PropertyType.car ? 0 : int.parse(_bedroomsController.text),
         bathrooms: _selectedType == PropertyType.land || _selectedType == PropertyType.car ? 0 : int.parse(_bathroomsController.text),
         landSize: _selectedType == PropertyType.land ? double.parse(_landSizeController.text) : null,
-        createdAt: DateTime.now(),
-        views: 0,
+        createdAt: _isEditing ? widget.propertyToEdit!.createdAt : DateTime.now(),
+        views: _isEditing ? widget.propertyToEdit!.views : 0,
         locationAddress: _locationAddressController.text,
-        googleMapsLink: _addMapsLink && _googleMapsLinkController.text.isNotEmpty 
-            ? _googleMapsLinkController.text 
-            : null,
-        videoUrl: uploadedVideoUrl,
+        googleMapsLink: _addMapsLink && _googleMapsLinkController.text.isNotEmpty ? _googleMapsLinkController.text : null,
+        videoUrl: _videoFile?.path,
         videoThumbnailUrl: _videoThumbnail,
         threeSixtyImageUrls: _threeSixtyImages.map((img) => img.path).toList(),
-        // Car fields
         carMake: _selectedType == PropertyType.car ? _carMakeController.text : null,
         carModel: _selectedType == PropertyType.car ? _carModelController.text : null,
         carYear: _selectedType == PropertyType.car ? int.tryParse(_carYearController.text) : null,
@@ -829,13 +594,21 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
         carCondition: _selectedType == PropertyType.car ? _carCondition : null,
       );
       
-      await MockDataService.addProperty(newProperty);
-      
-      if (SupabaseService.isAvailable) {
-        await SupabaseService.syncLocalToCloud();
+      if (_isEditing) {
+        await MockDataService.updateProperty(property);
+        if (SupabaseService.isAvailable) await SupabaseService.uploadProperty(property);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Property updated successfully!')),
+        );
+      } else {
+        await MockDataService.addProperty(property);
+        if (SupabaseService.isAvailable) await SupabaseService.syncLocalToCloud();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Property added successfully!')),
+        );
       }
       
-      Navigator.pop(context, newProperty);
+      Navigator.pop(context, true);
       setState(() => _isSubmitting = false);
     }
   }
